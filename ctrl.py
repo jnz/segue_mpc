@@ -37,7 +37,7 @@ current_fps = 0
 imuId = 0
 timestamp0 = time.time()
 timestamp_last = timestamp0
-sample_time = 1/100.0
+sample_time = 1/50.0
 frame_time = 0
 start_time = time.time()
 
@@ -153,7 +153,7 @@ try:
                 f4_c = ctypes.c_double(30.0)
                 b1_c = ctypes.c_double(5.73)
                 b2_c = ctypes.c_double(-200)
-                rbar = ctypes.c_double(0.6)
+                rbar = ctypes.c_double(0.5)
                 if libMPC.MPC_Init(pos_x_c, vel_x_c, theta_c, thetadot_c, f1_c, f2_c, f3_c, f4_c, b1_c, b2_c, rbar) == False:
                     print("Failed to initialize MPC library")
                     shutdown()

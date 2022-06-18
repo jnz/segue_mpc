@@ -287,8 +287,8 @@ end
 function [model] = control_init_linear_ext(model)
 
 model.ctrl_func = @control_run_linear_ext;
-model.N = 200;
-model.Nc = 40;
+model.N = 20;
+model.Nc = 10;
 
 %% Ext. Linear MPC
 Np = model.N;
@@ -309,7 +309,7 @@ model.lin_Rs = zeros(Np*size(Cp,1),1); % desired setpoint for next Np epochs
 [Phi, F] = mpcgainEx(Ap,Bp,Cp,Nc,Np);
 model.lin_Phi = Phi;
 model.lin_F = F;
-rw = 0.1; % tuning parameter
+rw = 1.5; % tuning parameter
 model.lin_Rbar = rw*eye(Nc);
 
 end
@@ -385,7 +385,7 @@ for i=2:length(uhorizon)
     uhorizon(i) = uhorizon(i-1) + DU(i);
 end
 Ypred = model.lin_F*x_e + model.lin_Phi*DU;
-% predict_plot(model, uhorizon, model.lin_Cp, Ypred, dt_sec);
+predict_plot(model, uhorizon, model.lin_Cp, Ypred, dt_sec);
 % </DEBUG>
 
 u = u + DU(1); % u(k) = u(k-1) + du(k)

@@ -22,11 +22,11 @@
 // #define USE_CL1NORM
 
 /** Number of MPC prediction epochs */
-#define N                   200
-#define Nc                  40
+#define N                   50
+#define Nc                  10
 #define STATE_LEN           4
 #define Y_LEN               2
-#define DT_SEC              (1.0/100.0)
+#define DT_SEC              (1.0/50.0)
 #define MODEL_UMAX          1.0
 #define MODEL_UMIN         -1.0
 
@@ -160,26 +160,24 @@ bool MPC_Run(double x_in, double in_xdot, double theta, double thetadot, double*
     ULIM.block<Nc, 1>(0, 0) *= MODEL_UMAX - *u;
     ULIM.block<Nc, 1>(Nc, 0) *= -MODEL_UMIN + *u;
 
-    Eigen::Matrix<double, STATE_LEN, 1> dx;
     x << x_in, in_xdot, theta, thetadot;
-    dx = x - x_prev;
+    const Eigen::Matrix<double, STATE_LEN, 1> dx = x - x_prev;
     x_prev = x;
 
-    Eigen::Matrix<double, Y_LEN, 1> y = Cp * x;
     Eigen::Matrix<double, STATE_LEN + Y_LEN, 1> x_e;
     x_e.block<STATE_LEN, 1>(0, 0) = dx;
-    x_e.block<Y_LEN, 1>(STATE_LEN, 0) = y;
+    x_e.block<Y_LEN, 1>(STATE_LEN, 0) = Cp * x; /* y = Cp * x */
 
-    #ifdef USE_CL1NORM
+  #ifdef USE_CL1NORM
     lstar.block<N*Y_LEN, 1>(0,0) = Rs - F * x_e;
     const cl1_result_t result =
         cl1_double(Astar, lstar, DU, NULL, NULL, &HU, &ULIM);
     const bool success = (result == CL1_OPT_SOL_FOUND);
-
-    #else
+  #else
     const Eigen::Matrix<double, Nc, 1> f = -Phi.transpose() * (Rs - F * x_e);
     bool success = qphild(H, f, HU, ULIM, DU);
-    #endif
+  #endif
+
     if (success)
     {
         *u = *u + DU(0);
