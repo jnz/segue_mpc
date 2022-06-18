@@ -20,8 +20,8 @@ epoch = control_every_n_epoch;
 model = model_init(model);
 % select control law here:
 % model = control_init_linear(model);
-% model = control_init_linear_ext(model);
-model = control_init_linear_ext_cl1norm(model);
+model = control_init_linear_ext(model);
+% model = control_init_linear_ext_cl1norm(model);
 % model = control_init_lqr(model);
 model.epochCtrl = 0;
 
@@ -287,8 +287,8 @@ end
 function [model] = control_init_linear_ext(model)
 
 model.ctrl_func = @control_run_linear_ext;
-model.N = 20;
-model.Nc = 10;
+model.N = 50;
+model.Nc = 25;
 
 %% Ext. Linear MPC
 Np = model.N;
@@ -304,6 +304,7 @@ model.lin_Bp = Bp;
 model.lin_Cp = Cp;
 
 model.lin_Rs = zeros(Np*size(Cp,1),1); % desired setpoint for next Np epochs
+% model.lin_Rs = repmat([0.5; 0], Np, 1);
 
 %[Phi, F] = mpcgain(Ap,Bp,Cp,Nc,Np);
 [Phi, F] = mpcgainEx(Ap,Bp,Cp,Nc,Np);
@@ -369,8 +370,9 @@ ULIM = [ones(Nc,1)*model.uMax - u; -model.uMin*ones(Nc,1) + u];
 % HU = [HU; eye(Nc); -eye(Nc)];
 % ULIM = [ULIM; ones(Nc*2, 1)*duMax];
 
-H = (model.lin_Phi'*model.lin_Phi + model.lin_Rbar);
-f = -model.lin_Phi'*(model.lin_Rs - model.lin_F*x_e);
+Q = diag(repmat([2; 1], model.N, 1));
+H = (model.lin_Phi'*Q*model.lin_Phi + model.lin_Rbar);
+f = -model.lin_Phi'*Q*(model.lin_Rs - model.lin_F*x_e);
 
 %A = model.lin_Phi;
 %A = [A; eye(Nc)];
@@ -388,7 +390,7 @@ for i=2:length(uhorizon)
     uhorizon(i) = uhorizon(i-1) + DU(i);
 end
 Ypred = model.lin_F*x_e + model.lin_Phi*DU;
-predict_plot(model, uhorizon, model.lin_Cp, Ypred, dt_sec);
+% predict_plot(model, uhorizon, model.lin_Cp, Ypred, dt_sec);
 % </DEBUG>
 
 u = u + DU(1); % u(k) = u(k-1) + du(k)

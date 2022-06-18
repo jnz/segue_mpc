@@ -19,7 +19,7 @@
  ******************************************************************************/
 
 #define USE_EXT_STATE
-#define USE_CL1NORM
+// #define USE_CL1NORM
 
 /** Number of MPC prediction epochs */
 #define N                     50
@@ -57,6 +57,7 @@ static Eigen::Matrix<double, Y_LEN, STATE_LEN> Cp; /**< map state to setpoint: y
 static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> HU; /**< <Nc*2 x Nc> control input constraint design matrix */
 static Eigen::Matrix<double, Eigen::Dynamic, 1> ULIM; /**< <Nc*2, 1> control input constraints */
 
+static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Q; /**< <NxN> State cost matrix */
 static Eigen::Matrix<double, Nc, Nc> H; /**< <NcxNc> cache result of = (Phi.transpose() * Phi + Rbar); */
 
 #ifdef USE_CL1NORM
@@ -122,6 +123,21 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
 
 #ifdef USE_EXT_STATE
     mpcgainEx(Ap, Bp, Cp, Nc, N, /*out:*/Phi, /*out:*/F);
+
+    Q.resize(N*Y_LEN, N*Y_LEN);
+    Q.setIdentity();
+    /* set weights of velocity higher */
+    /*
+    for (int i=0;i<Q.rows();i+=2)
+    {
+        Q(i, i) *= 1.5;
+    }
+    */
+    Eigen::Matrix<double, Nc, Nc> Rbar;
+    Rbar.setIdentity();
+    Rbar *= rbar;
+    H = (Phi.transpose()*Q*Phi + Rbar);
+
     #ifdef USE_CL1NORM
     Astar.resize(N*Y_LEN + Nc, Nc);
     Astar.block<Nc, Nc>(N*Y_LEN, 0).setIdentity();
@@ -141,11 +157,6 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     ULIM.block<Nc, 1>(0, 0) *= MODEL_UMAX;
     ULIM.block<Nc, 1>(Nc, 0) *= -MODEL_UMIN;
 #endif
-
-    Eigen::Matrix<double, Nc, Nc> Rbar;
-    Rbar.setIdentity();
-    Rbar *= rbar;
-    H = (Phi.transpose()*Phi + Rbar);
 
     return true;
 }
@@ -178,7 +189,7 @@ bool MPC_Run(double x_in, double in_xdot, double theta, double thetadot, double*
         cl1_double(Astar, lstar, DU, NULL, NULL, &HU, &ULIM);
     const bool success = (result == CL1_OPT_SOL_FOUND);
   #else
-    const Eigen::Matrix<double, Nc, 1> f = -Phi.transpose() * (Rs - F * x_e);
+    const Eigen::Matrix<double, Nc, 1> f = -Phi.transpose() * Q * (Rs - F * x_e);
     bool success = qphild(H, f, HU, ULIM, DU);
   #endif
 
