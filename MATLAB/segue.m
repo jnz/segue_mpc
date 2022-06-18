@@ -11,7 +11,7 @@ cleanup_figures   = onCleanup(@() eval('close all'));
 cleanup_functions = onCleanup(@() eval('clear functions'));
 
 %% Simulation Parameter
-model.dt_ctrl_sec = 1/100;
+model.dt_ctrl_sec = 1/50;
 control_every_n_epoch = 20;
 model.dt_sim_sec = model.dt_ctrl_sec / control_every_n_epoch;
 epoch = control_every_n_epoch;
@@ -20,8 +20,8 @@ epoch = control_every_n_epoch;
 model = model_init(model);
 % select control law here:
 % model = control_init_linear(model);
-model = control_init_linear_ext(model);
-% model = control_init_linear_ext_cl1norm(model);
+% model = control_init_linear_ext(model);
+model = control_init_linear_ext_cl1norm(model);
 % model = control_init_lqr(model);
 model.epochCtrl = 0;
 
@@ -317,8 +317,8 @@ end
 function [model] = control_init_linear_ext_cl1norm(model)
 
 model.ctrl_func = @control_run_linear_ext_cl1norm;
-model.N = 40;
-model.Nc = 10;
+model.N = 50;
+model.Nc = 25;
 
 %% Ext. Linear MPC
 Np = model.N;
@@ -338,6 +338,9 @@ model.lin_Rs = zeros(Np*size(Cp,1),1); % desired setpoint for next Np epochs
 [Phi, F] = mpcgainEx(Ap,Bp,Cp,Nc,Np);
 model.lin_Phi = Phi;
 model.lin_F = F;
+
+CL1COST = 2.2;
+model.lin_Astar = [model.lin_Phi; CL1COST*eye(Nc)];
 
 end
 
@@ -411,11 +414,9 @@ ULIM = [ones(Nc,1)*model.uMax - u; -model.uMin*ones(Nc,1) + u];
 % HU = [HU; eye(Nc); -eye(Nc)];
 % ULIM = [ULIM; ones(Nc*2, 1)*duMax];
 
-A = model.lin_Phi;
-A = [A; eye(Nc)];
 l = model.lin_Rs-model.lin_F*x_e;
 l = [l; zeros(Nc, 1)];
-DU = cl1norm(A, l, [],[], HU, ULIM);
+DU = cl1norm(model.lin_Astar, l, [],[], HU, ULIM);
 
 % <DEBUG>
 uhorizon = DU*0;

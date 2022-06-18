@@ -23,7 +23,7 @@
 
 /** Number of MPC prediction epochs */
 #define N                     50
-#define Nc                    15
+#define Nc                    25
 #define STATE_LEN             4
 #define Y_LEN                 2
 #define DT_SEC                (1.0/50.0)
@@ -31,6 +31,7 @@
 #define MODEL_UMIN           -1.0
 
 #define CL1NORM_INPUT_WEIGHT  2.2
+
 /******************************************************************************
  * TYPEDEFS
  ******************************************************************************/
