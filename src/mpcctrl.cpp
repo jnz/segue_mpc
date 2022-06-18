@@ -8,6 +8,7 @@
  * PROJECT INCLUDE FILES
  ******************************************************************************/
 
+#include "cl1norm.h"
 #include "mpcgain.h"
 #include "mpcctrl.h"
 #include "qphild.h"
@@ -18,13 +19,14 @@
  ******************************************************************************/
 
 #define USE_EXT_STATE
+// #define USE_CL1NORM
 
 /** Number of MPC prediction epochs */
-#define N                   100
-#define Nc                  20
+#define N                   200
+#define Nc                  40
 #define STATE_LEN           4
 #define Y_LEN               2
-#define DT_SEC              (1.0/50.0)
+#define DT_SEC              (1.0/100.0)
 #define MODEL_UMAX          1.0
 #define MODEL_UMIN         -1.0
 
@@ -47,13 +49,18 @@ static Eigen::Matrix<double, STATE_LEN, 1> x_prev;
 
 static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Phi; /* <(N*Y_LEN) x Nc> */
 static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> F; /* <(N*Y_LEN) x (STATE_LEN+YLEN)> matrix: augmented state model */
-static Eigen::Matrix<double, N*Y_LEN, 1> Rs; /* reference / setpoint */
-static Eigen::Matrix<double, Y_LEN, STATE_LEN> Cp;
+static Eigen::Matrix<double, N*Y_LEN, 1> Rs; /**< reference / setpoint vector */
+static Eigen::Matrix<double, Y_LEN, STATE_LEN> Cp; /**< map state to setpoint: y = Rs = Cp*x */
 
-static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> HU; /* <Nc*2 x Nc> control input constraint design matrix */
-static Eigen::Matrix<double, Eigen::Dynamic, 1> ULIM; /* <Nc*2, 1> control input constraints */
+static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> HU; /**< <Nc*2 x Nc> control input constraint design matrix */
+static Eigen::Matrix<double, Eigen::Dynamic, 1> ULIM; /**< <Nc*2, 1> control input constraints */
 
-static Eigen::Matrix<double, Nc, Nc> H; /* <NcxNc> cache result of = (Phi.transpose() * Phi + Rbar); */
+static Eigen::Matrix<double, Nc, Nc> H; /**< <NcxNc> cache result of = (Phi.transpose() * Phi + Rbar); */
+
+#ifdef USE_CL1NORM
+static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Astar; /* <N*Y_LEN + Nc x Nc> */
+static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> lstar; /* <N*Y_LEN + Nc x 1> */
+#endif
 
 /******************************************************************************
  * LOCAL FUNCTION PROTOTYPES
@@ -67,10 +74,11 @@ static Eigen::Matrix<double, Nc, Nc> H; /* <NcxNc> cache result of = (Phi.transp
  * FUNCTION BODIES
  ******************************************************************************/
 
+/** @brief Convert a cont. system to a discrete system. */
 static void c2dm(const Eigen::Matrix<double, STATE_LEN, STATE_LEN>& A,
                  const Eigen::Matrix<double, STATE_LEN, 1>& B,
-                 Eigen::Matrix<double, STATE_LEN, STATE_LEN>& Ap,
-                 Eigen::Matrix<double, STATE_LEN, 1>& Bp,
+                 Eigen::Matrix<double, STATE_LEN, STATE_LEN>& Ap /*output*/,
+                 Eigen::Matrix<double, STATE_LEN, 1>& Bp /*output*/,
                  const double dt_sec)
 {
     Ap.setIdentity();
@@ -93,7 +101,8 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
 
     Eigen::Matrix<double, STATE_LEN, STATE_LEN> Ap;
     Eigen::Matrix<double, STATE_LEN, 1> Bp;
-    Cp << 0,1,0,0,  0,0,1,0; // y = C*x
+    /* Track velocity and angle theta */
+    Cp << 0,1,0,0, 0,0,1,0; // y = C*x
     c2dm(A, B, Ap, Bp, DT_SEC);
 
     Rs.setZero(); /* set zero as reference trajectory */
@@ -103,15 +112,22 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     HU.block<Nc, Nc>(0, 0).triangularView<Eigen::Lower>().setOnes();
     HU.block<Nc, Nc>(Nc, 0).triangularView<Eigen::Lower>().setOnes();
     HU.block<Nc, Nc>(Nc, 0) *= -1.0;
-
     ULIM.resize(Nc*2, 1);
 
-    std::cout << "Ap = " << std::endl << Ap << std::endl << std::endl;
-    std::cout << "Bp = " << std::endl << Bp << std::endl << std::endl;
-    std::cout << "Cp = " << std::endl << Cp << std::endl << std::endl;
+    // std::cout << "Ap = " << std::endl << Ap << std::endl << std::endl;
+    // std::cout << "Bp = " << std::endl << Bp << std::endl << std::endl;
+    // std::cout << "Cp = " << std::endl << Cp << std::endl << std::endl;
 
 #ifdef USE_EXT_STATE
     mpcgainEx(Ap, Bp, Cp, Nc, N, /*out:*/Phi, /*out:*/F);
+    #ifdef USE_CL1NORM
+    Astar.resize(N*Y_LEN + Nc, Nc);
+    Astar.block<N*Y_LEN, Nc>(0, 0) = Phi;
+    Astar.block<N*Y_LEN, Nc>(N*Y_LEN, 0).setIdentity();
+    lstar.resize(N*Y_LEN + Nc, 1);
+    lstar.setZero();
+    std::cout << "Astar = " << std::endl << Astar << std::endl << std::endl;
+    #endif
 #else
     mpcgain(Ap, Bp, Cp, Nc, N, /*out:*/Phi, /*out:*/F);
 
@@ -154,8 +170,16 @@ bool MPC_Run(double x_in, double in_xdot, double theta, double thetadot, double*
     x_e.block<STATE_LEN, 1>(0, 0) = dx;
     x_e.block<Y_LEN, 1>(STATE_LEN, 0) = y;
 
+    #ifdef USE_CL1NORM
+    lstar.block<N*Y_LEN, 1>(0,0) = Rs - F * x_e;
+    const cl1_result_t result =
+        cl1_double(Astar, lstar, DU, NULL, NULL, &HU, &ULIM);
+    const bool success = (result == CL1_OPT_SOL_FOUND);
+
+    #else
     const Eigen::Matrix<double, Nc, 1> f = -Phi.transpose() * (Rs - F * x_e);
     bool success = qphild(H, f, HU, ULIM, DU);
+    #endif
     if (success)
     {
         *u = *u + DU(0);

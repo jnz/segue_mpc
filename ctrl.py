@@ -37,7 +37,7 @@ current_fps = 0
 imuId = 0
 timestamp0 = time.time()
 timestamp_last = timestamp0
-sample_time = 1/50.0
+sample_time = 1/100.0
 frame_time = 0
 start_time = time.time()
 
@@ -84,7 +84,7 @@ try:
             continue
 
         cl = cc.split(' ')
-        if len(cl) != 11 or cl[0] != "L":
+        if len(cl) != 12 or cl[0] != "L":
             print("Incomplete low-level machine message")
             continue
 
@@ -92,6 +92,7 @@ try:
         ticks_left = float(cl[8])
         ticks_right = float(cl[9])
         voltage = float(cl[10])/10.0
+        inputfreqHz = int(cl[11])
         dx = 0.5*(ticks_left+ticks_right)*meters_per_tick
         pos_x = pos_x + dx
         vel_x = dx/(dt_ms_ticks/1000.0)
@@ -167,7 +168,7 @@ try:
         if u < -1.0:
             u = -1.0
 
-        print("Time %.3f %2i Hz (%2.0f/%2.0fms) AHRS=%i CTRL=%i u=%5.2f x=%8.3f v=%6.3f theta=%6.1f dot=%6.0f V=%.1f" % (time_sec, current_fps, frame_time*1000, sample_time*1000, statusAhrsValid, isMpcInit, u, pos_x, vel_x, theta_c.value*180.0/np.pi, thetadot_c.value*180.0/np.pi, voltage)) # , flush=True) # end='\r'
+        print("Time %.3f %2i Hz (%2.0f/%2.0fms) AHRS=%i CTRL=%i u=%5.2f x=%8.3f v=%6.3f theta=%6.1f dot=%6.0f V=%.1f %i Hz" % (time_sec, current_fps, frame_time*1000, sample_time*1000, statusAhrsValid, isMpcInit, u, pos_x, vel_x, theta_c.value*180.0/np.pi, thetadot_c.value*180.0/np.pi, voltage, inputfreqHz)) # , flush=True) # end='\r'
         flog.write("%8.3f %i %5.2f %8.3f %6.3f %6.1f %6.1f %6.1f %6.1f %6.1f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f\n" % (time_sec, statusAhrsValid, u, pos_x, vel_x, theta_c.value*180.0/np.pi, thetadot_c.value*180.0/np.pi, roll_c.value, pitch_c.value, yaw_c.value, accX, accY, accZ, gyrX, gyrY, gyrZ))
 
         ser.write(b'<%i,%i>' % (u*255.0, u*255.0))
