@@ -9,7 +9,7 @@
 MPU6050 MPU6050;
 Motor Motor;
 
-#define DT_MS     10
+#define DT_MS     20
 #define VOL_MEASURE_PIN A2
 
 unsigned long Motor::encoder_count_left_a; // encoder ticks
@@ -55,7 +55,7 @@ void interrupt()
 
   const int dt_ms = millis() - g_last_output;
   g_last_output = millis();
-  sprintf(textbuf, "L %02i %i %i %i %i %i %i %i %i %i %i", dt_ms, (int)ax, (int)ay, (int)az, (int)gx, (int)gy, (int)gz, g_encoder_delta_left, g_encoder_delta_right, (int)g_voltage, (int)g_epochInput);
+  sprintf(textbuf, "L %02i %i %i %i %i %i %i %i %i %i %i", dt_ms, (int)ax, (int)ay, (int)az, (int)gx, (int)gy, (int)gz, g_encoder_delta_left, g_encoder_delta_right, (int)g_voltage, (int)g_hz_input);
   g_encoder_delta_left = 0;
   g_encoder_delta_right = 0;
   Serial.println(textbuf);

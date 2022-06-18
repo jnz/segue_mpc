@@ -19,17 +19,18 @@
  ******************************************************************************/
 
 #define USE_EXT_STATE
-// #define USE_CL1NORM
+#define USE_CL1NORM
 
 /** Number of MPC prediction epochs */
-#define N                   50
-#define Nc                  10
-#define STATE_LEN           4
-#define Y_LEN               2
-#define DT_SEC              (1.0/50.0)
-#define MODEL_UMAX          1.0
-#define MODEL_UMIN         -1.0
+#define N                     50
+#define Nc                    15
+#define STATE_LEN             4
+#define Y_LEN                 2
+#define DT_SEC                (1.0/50.0)
+#define MODEL_UMAX            1.0
+#define MODEL_UMIN           -1.0
 
+#define CL1NORM_INPUT_WEIGHT  1.8
 /******************************************************************************
  * TYPEDEFS
  ******************************************************************************/
@@ -122,11 +123,15 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     mpcgainEx(Ap, Bp, Cp, Nc, N, /*out:*/Phi, /*out:*/F);
     #ifdef USE_CL1NORM
     Astar.resize(N*Y_LEN + Nc, Nc);
+    Astar.block<Nc, Nc>(N*Y_LEN, 0).setIdentity();
+    Astar *= CL1NORM_INPUT_WEIGHT; /* CL1 NORM TUNING PARAMETER SIMILAR TO RBAR */
     Astar.block<N*Y_LEN, Nc>(0, 0) = Phi;
-    Astar.block<N*Y_LEN, Nc>(N*Y_LEN, 0).setIdentity();
     lstar.resize(N*Y_LEN + Nc, 1);
     lstar.setZero();
-    std::cout << "Astar = " << std::endl << Astar << std::endl << std::endl;
+
+    std::cout << "CL1NORM active. Control weight: " << CL1NORM_INPUT_WEIGHT << " Astar = " << std::endl << Astar << std::endl << std::endl;
+#else
+    std::cout << "Extended state model active." << std::endl << std::endl;
     #endif
 #else
     mpcgain(Ap, Bp, Cp, Nc, N, /*out:*/Phi, /*out:*/F);
@@ -135,8 +140,6 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     ULIM.block<Nc, 1>(0, 0) *= MODEL_UMAX;
     ULIM.block<Nc, 1>(Nc, 0) *= -MODEL_UMIN;
 #endif
-    std::cout << "Phi = " << std::endl << Phi << std::endl << std::endl;
-    std::cout << "F = " << std::endl << F << std::endl << std::endl;
 
     Eigen::Matrix<double, Nc, Nc> Rbar;
     Rbar.setIdentity();
