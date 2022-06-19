@@ -307,6 +307,14 @@ model.lin_Cp = Cp;
 model.lin_Rs = zeros(Np*size(Cp,1),1); % desired setpoint for next Np epochs
 % model.lin_Rs = repmat([0.5; 0], Np, 1);
 
+% State constraints
+% -Phi * DU < -Ymin + F*x_e
+%  Phi * DU <  Ymax - F*x_e
+% Ymin = repmat([-10; -20*pi/180], model.N, 1); % min. -10 m/s, -20 ° theta
+% Ymax = repmat([ 10;  20*pi/180], model.N, 1); % max.  10 m/s,  20 ° theta
+% HU = [HU; -model.lin_Phi;model.lin_Phi];
+% ULIM = [ULIM; -Ymin + model.lin_F*x_e; Ymax - model.lin_F*x_e];
+
 %[Phi, F] = mpcgain(Ap,Bp,Cp,Nc,Np);
 [Phi, F] = mpcgainEx(Ap,Bp,Cp,Nc,Np);
 model.lin_Phi = Phi;
