@@ -54,7 +54,7 @@ start_time = time.time()
 
 isMpcInit = False              # libctrl.so initialized and ready?
 u = 0                          # motor command between -1.0 and 1.0 (0.0 = off)
-theta_correction = 1.2         # robot angle correction in degree
+theta_correction = 0.8         # robot angle correction in degree
 theta_c = ctypes.c_double(pitch_c.value*np.pi/180.0) # robot angle (0 = upright)
 thetadot_c = ctypes.c_double(0) # rotation rate of robot
 thetadot_correction_c = ctypes.c_float(0) # gyroscope/rotation rate bias correction
@@ -62,18 +62,15 @@ pos_x = 0                      # start robot position at 0
 vel_x = 0                      # initial velocity
 meters_per_tick = 0.00027195   # convert wheel odometry ticks to meter
 
-# Velocity PID ctrl
-thetaCtrlMax = 2*np.pi/180
-pid_vel_max_err = 0.08
-pid_vel_p = (0.5*np.pi/180)/pid_vel_max_err
-pid_vel_i = 0.0 
-pid_vel_Ki = (1.0*np.pi/180)/pid_vel_max_err
-thetaCtrl = 0
+# Angle ctrl
+thetaCtrlMax = 5*np.pi/180
+thetaCtrl = 0.0
 
 pid_heading_p = 0.01
 pid_setpoint_heading = 0
 pid_max_heading_err = 5.0*np.pi/180.0
 pid_heading_pwm = 0.0
+heading_err = 0
 
 def constrain(val, min_val, max_val):
     return min(max_val, max(min_val, val))
@@ -84,6 +81,13 @@ def motorStop():
 def shutdown():
     motorStop()
     quit()
+
+def normalize_angle(angle):
+        if angle < -np.pi:
+            angle = 2.0 * np.pi + angle
+        if angle > np.pi:
+            angle = -2.0 * pi + angle
+        return angle
 
 flog = open("logfile.txt", "w") # log data (can be viewed with MATLAB/analyze_log.m)
 
@@ -158,17 +162,14 @@ try:
             theta_c = ctypes.c_double(-pitch_c.value*np.pi/180.0 + theta_correction*np.pi/180.0)
             thetadot_c = ctypes.c_double(-(gyrY - thetadot_correction_c.value))
 
-            if np.abs(theta_c.value) < 22.0*np.pi/180.0 and isMpcInit:
-                vel_err = (0 - vel_x)
-                pid_vel_i = pid_vel_i + vel_err*sample_time
-                pid_vel_i = constrain(pid_vel_i, -pid_vel_max_err, pid_vel_max_err)
-                thetaCtrl = constrain(vel_err*pid_vel_p + pid_vel_Ki*pid_vel_i, -thetaCtrlMax, thetaCtrlMax)
+            if np.abs(theta_c.value) < 25.0*np.pi/180.0 and isMpcInit:
+                thetaCtrl = constrain(thetaCtrl, -thetaCtrlMax, thetaCtrlMax)
                 thetaCtrl_c = ctypes.c_double(thetaCtrl)
                 libMPC.MPC_SetThetaRef(thetaCtrl_c)
 
-                heading_err = pid_setpoint_heading - yaw_c.value*np.pi/180
-                heading_err = constrain(heading_err, -pid_max_heading_err, pid_max_heading_err)
-                pid_heading_pwm = 0.025*heading_err/pid_max_heading_err
+                heading_err = normalize_angle(pid_setpoint_heading - yaw_c.value*np.pi/180)
+                heading_err_limit = constrain(heading_err, -pid_max_heading_err, pid_max_heading_err)
+                pid_heading_pwm = 0.025*heading_err_limit/pid_max_heading_err
 
                 u_c = ctypes.c_double(u)
                 pos_x_c = ctypes.c_double(pos_x)
@@ -205,8 +206,8 @@ try:
 
         u = constrain(u, -1.0, 1.0)
 
-        print("Time %.3f %2i Hz (%2.0f/%2.0fms) AHRS=%i CTRL=%i u=%5.2f x=%8.3f v=%6.3f theta=%6.1f dot=%6.0f V=%.1f %i Hz | Theta Offset %.1f deg INT: %.2f | Heading PWM: %.2f" % (time_sec, current_fps, frame_time*1000, sample_time*1000, statusAhrsValid, isMpcInit, u, pos_x, vel_x, theta_c.value*180.0/np.pi, thetadot_c.value*180.0/np.pi, voltage, inputfreqHz, thetaCtrl*180.0/np.pi, pid_vel_i, pid_heading_pwm)) # , flush=True) # end='\r'
-        flog.write("%8.3f %i %5.2f %8.3f %6.3f %6.1f %6.1f %6.1f %6.1f %6.1f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f\n" % (time_sec, statusAhrsValid, u, pos_x, vel_x, theta_c.value*180.0/np.pi, thetadot_c.value*180.0/np.pi, roll_c.value, pitch_c.value, yaw_c.value, accX, accY, accZ, gyrX, gyrY, gyrZ))
+        print("Time %.3f %2i Hz (%2.0f/%2.0fms) AHRS=%i CTRL=%i u=%5.2f x=%8.3f v=%6.3f theta=%6.1f dot=%6.0f V=%.1f %i Hz | Theta Offset %.1f deg | Heading corr: %.2f Err: %.1f" % (time_sec, current_fps, frame_time*1000, sample_time*1000, statusAhrsValid, isMpcInit, u, pos_x, vel_x, theta_c.value*180.0/np.pi, thetadot_c.value*180.0/np.pi, voltage, inputfreqHz, thetaCtrl*180.0/np.pi, pid_heading_pwm, heading_err*180.0/np.pi)) # , flush=True) # end='\r'
+        flog.write("%8.3f %i %5.2f %8.3f %6.3f %6.1f %6.1f %6.1f %6.1f %6.1f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %6.1f\n" % (time_sec, statusAhrsValid, u, pos_x, vel_x, theta_c.value*180.0/np.pi, thetadot_c.value*180.0/np.pi, roll_c.value, pitch_c.value, yaw_c.value, accX, accY, accZ, gyrX, gyrY, gyrZ, thetaCtrl*180.0/np.pi))
 
         uL = constrain(u+pid_heading_pwm, -1.0, 1.0)
         uR = constrain(u-pid_heading_pwm, -1.0, 1.0)
