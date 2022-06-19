@@ -153,12 +153,12 @@ end
 
 function [x_k_dot, A, B] = fdot(x_k, u, model)
 
-f1 = -7.54;
-f2 = 0.03;
-f3 = 0;  % friction
-f4 = 30; % estimated from drop tests
-b1 = 5.73;
-b2 = -200;
+f1 = -7.54; % estimated from sysidF1.m
+f2 = 0.03;  % estimated from sysidF1.m
+f3 = 0;     % friction
+f4 = 30;    % estimated from drop tests in sysidF4.m
+b1 = 5.73;  % estimated from sysidF1.m
+b2 = -200;  % estimated experimentally
 
 %% STATE SPACE MODEL
 
@@ -166,6 +166,7 @@ A = [0      1              0                0;
      0      f1             f2               0;
      0      0              0                1;
      0      f3             f4               0];
+
 B = [     0;
           b1;
           0;
@@ -263,22 +264,22 @@ figure(99);
 clf;
 hold on;
 plot(time_sec, Ysim(:,1), 'k-*');
-plot(time_sec, Ysim_euler(:,1), 'b->');
+% plot(time_sec, Ysim_euler(:,1), 'b->');
 plot(time_sec, Ypred(:,1), 'r--');
-stairs(time_sec, uhorizon*max(abs(Ysim(:,1)))/5, 'b');
-legend('Velocity sim (RK4)', 'Velocity sim (Euler)', 'Velocity pred');
-xlabel('Time (sec');
+stairs(time_sec, uhorizon*max(abs(Ysim(:,1)))*1.4, 'b');
+legend('Velocity True (RK4)', 'Velocity Predicted by MPC at t=0', 'Predicted Control Input (u)');
+xlabel('Time (s)');
 ylabel('Velocity (m/s)');
 
 figure(98);
 clf;
 hold on;
 plot(time_sec, Ysim(:,index)*180/pi, 'k-*');
-plot(time_sec, Ysim_euler(:,index)*180/pi, 'b->');
+% plot(time_sec, Ysim_euler(:,index)*180/pi, 'b->');
 plot(time_sec, Ypred(:,index)*180/pi, 'r--');
 stairs(time_sec, uhorizon*max(abs(Ysim(:,index)*180/pi))/5, 'b');
-legend('Theta sim RK4(°)', 'Theta sim Euler(°)', 'Theta pred(°)');
-xlabel('Time (sec');
+legend('Theta sim RK4(°)', 'Theta (°) Predicted by MPC');
+xlabel('Time (s)');
 ylabel('Theta (°)');
 ylim([-90 90]);
 
@@ -390,7 +391,7 @@ for i=2:length(uhorizon)
     uhorizon(i) = uhorizon(i-1) + DU(i);
 end
 Ypred = model.lin_F*x_e + model.lin_Phi*DU;
-% predict_plot(model, uhorizon, model.lin_Cp, Ypred, dt_sec);
+predict_plot(model, uhorizon, model.lin_Cp, Ypred, dt_sec);
 % </DEBUG>
 
 u = u + DU(1); % u(k) = u(k-1) + du(k)
@@ -519,6 +520,8 @@ rectangle('Position', [x-R 0 2*R 2*R],'Curvature',[1 1], 'FaceColor', '#CE54FC',
 % set(gcf,'Position',get(0, 'Screensize'))
 
 % drawnow limitrate nocallbacks;
+xlabel('Position (m)');
+ylabel('Up (m)');
 drawnow limitrate;
 
 end

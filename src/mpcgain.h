@@ -87,7 +87,9 @@ void mpcgain(const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Ap,
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Phi,
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& F);
 
+
 /** @brief Compute linear MPC gain matrices for an extended state model
+* (to support integral action)
 *
 * Basic model (inputs):
 *
@@ -109,18 +111,18 @@ void mpcgain(const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Ap,
 *   dx(k) = x(k) - x(k-1)
 *   du(k) = u(k) - u(k-1)
 *   dx(k+1) = Ap*dx(k) + Bp*du(k)
-*   y(k+1)  = Cp*Ap*dx(k) + Cp*Bp*du(k) + y(k) 
+*   y(k+1)  = Cp*Ap*dx(k) + Cp*Bp*du(k) + y(k)
 *
 *   x_e(k) = [ dx(k); y(k) ]
 *
 * Extended/augmented model (denoted by underscore _e):
 *
 *    x_e(k+1) = A_e*x_e(k) + B_e*du(k)
-*    A_e = [ Ap     0; 
+*    A_e = [ Ap     0;
 *            Cp*Ap  1 ];
 *    B_e = [ Bp ;
 *            Cp*Bp ];
-*    
+*
 *    y(k) = C_e*x_e(k) = [ 0 Cp ]*x_e(k)
 *
 * Prediction of state(s) y over Np epochs:
@@ -156,7 +158,7 @@ void mpcgain(const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Ap,
 *
 * If a cost for control effort is to be added, the following
 * cost function minimizes errors between predicted state and desired
-* state (first term) and minimize control effort (keep DU small): 
+* state (first term) and minimize control effort (keep DU small):
 * J = (Rs − Y)'*(Rs − Y) + DU'*Rbar*DU
 *
 * with:

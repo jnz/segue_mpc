@@ -18,19 +18,25 @@
  * DEFINES
  ******************************************************************************/
 
-#define USE_EXT_STATE
-// #define USE_CL1NORM
+#define USE_EXT_STATE /**< enable integrator action with the extended state model */
 
-/** Number of MPC prediction epochs */
-#define N                     50
-#define Nc                    25
-#define STATE_LEN             4
-#define Y_LEN                 2
-#define DT_SEC                (1.0/50.0)
-#define MODEL_UMAX            1.0
-#define MODEL_UMIN           -1.0
+// #define USE_CL1NORM /**< solve extended state model with CL1NORM instead of qphild */
 
-#define CL1NORM_INPUT_WEIGHT  2.2
+#ifdef USE_CL1NORM
+  #ifndef USE_EXT_STATE
+     #define USE_EXT_STATE
+  #endif
+#endif
+
+#define DT_SEC                (1.0/50.0)    /* update frequency */
+#define N                     50            /* prediction epochs */
+#define Nc                    25            /* Nc <= N, number of control epochs */
+#define STATE_LEN             4             /* size of state vector x (position, velocity, theta, thetadot) */
+#define Y_LEN                 2             /* size of reference state vector */
+#define MODEL_UMAX            1.0           /* control input u constraint */
+#define MODEL_UMIN           -1.0           /* control input u constraint */
+
+#define CL1NORM_INPUT_WEIGHT  2.2           /* control input penalty for CL1NORM */
 
 /******************************************************************************
  * TYPEDEFS
@@ -49,8 +55,8 @@ static Eigen::Matrix<double, STATE_LEN, 1> x;
 /** State x from previous epoch */
 static Eigen::Matrix<double, STATE_LEN, 1> x_prev;
 
-static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Phi; /* <(N*Y_LEN) x Nc> */
-static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> F; /* <(N*Y_LEN) x (STATE_LEN+YLEN)> matrix: augmented state model */
+static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Phi; /**< <(N*Y_LEN) x Nc> */
+static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> F; /**< <(N*Y_LEN) x (STATE_LEN+YLEN)> matrix: augmented state model */
 static Eigen::Matrix<double, N*Y_LEN, 1> Rs; /**< reference / setpoint vector */
 static Eigen::Matrix<double, Y_LEN, STATE_LEN> Cp; /**< map state to setpoint: y = Rs = Cp*x */
 
@@ -61,8 +67,8 @@ static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Q; /**< <NxN> State
 static Eigen::Matrix<double, Nc, Nc> H; /**< <NcxNc> cache result of = (Phi.transpose() * Phi + Rbar); */
 
 #ifdef USE_CL1NORM
-static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Astar; /* <N*Y_LEN + Nc x Nc> */
-static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> lstar; /* <N*Y_LEN + Nc x 1> */
+static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Astar; /**< <N*Y_LEN + Nc x Nc> Design matrix for CL1NORM */
+static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> lstar; /**< <N*Y_LEN + Nc x 1> Measurement vector for CL1NORM */
 #endif
 
 /******************************************************************************
@@ -77,7 +83,11 @@ static Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> lstar; /* <N*Y_LEN 
  * FUNCTION BODIES
  ******************************************************************************/
 
-/** @brief Convert a cont. system to a discrete system. */
+/** @brief Convert a cont. system to a discrete system.
+ *
+ * In MATLAB:
+ *      [Ap, Bp] = c2dm(A, B, Cp, zeros(size(Cp,1),1), dt_sec);
+ **/
 static void c2dm(const Eigen::Matrix<double, STATE_LEN, STATE_LEN>& A,
                  const Eigen::Matrix<double, STATE_LEN, 1>& B,
                  Eigen::Matrix<double, STATE_LEN, STATE_LEN>& Ap /*output*/,
@@ -91,8 +101,8 @@ static void c2dm(const Eigen::Matrix<double, STATE_LEN, STATE_LEN>& A,
 
 bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double f1, double f2, double f3, double f4, double b1, double b2, double rbar)
 {
-    x << pos_x, vel_x, theta, thetadot;
-    x_prev = x;
+    /* Setup MPC controller */
+    /* -------------------- */
 
     Eigen::Matrix<double, STATE_LEN, STATE_LEN> A;
     Eigen::Matrix<double, STATE_LEN, 1> B;
@@ -106,6 +116,7 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     Eigen::Matrix<double, STATE_LEN, 1> Bp;
     /* Track velocity and angle theta */
     Cp << 0,1,0,0, 0,0,1,0; // y = C*x
+    // Cp << 0,0,1,0; // y = C*x
     c2dm(A, B, Ap, Bp, DT_SEC);
 
     Rs.setZero(); /* set zero as reference trajectory */
@@ -117,11 +128,9 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     HU.block<Nc, Nc>(Nc, 0) *= -1.0;
     ULIM.resize(Nc*2, 1);
 
-    // std::cout << "Ap = " << std::endl << Ap << std::endl << std::endl;
-    // std::cout << "Bp = " << std::endl << Bp << std::endl << std::endl;
-    // std::cout << "Cp = " << std::endl << Cp << std::endl << std::endl;
-
 #ifdef USE_EXT_STATE
+    x_prev << pos_x, vel_x, theta, thetadot; /* store previous state for ext. state model */
+
     mpcgainEx(Ap, Bp, Cp, Nc, N, /*out:*/Phi, /*out:*/F);
 
     Q.resize(N*Y_LEN, N*Y_LEN);
@@ -198,6 +207,7 @@ bool MPC_Run(double x_in, double in_xdot, double theta, double thetadot, double*
         *u = *u + DU(0);
     }
     return success;
+
 #else
     Eigen::Matrix<double, Eigen::Dynamic, 1> U; /* output result */
     x << x_in, in_xdot, theta, thetadot;

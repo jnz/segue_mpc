@@ -2,7 +2,7 @@
 
 /*
  * Compile in MATLAB as .mex file with:
- *      mex -O mpcctrl_mex.cpp mpcctrl.cpp mpcgain.cpp -DCL1NORM_NO_MEX cl1norm.cpp -I./
+ *      mex -O mpcctrl_mex.cpp mpcctrl.cpp mpcgain.cpp qphild.cpp -DCL1NORM_NO_MEX cl1norm.cpp -I./
  */
 
 #include "mex.h"

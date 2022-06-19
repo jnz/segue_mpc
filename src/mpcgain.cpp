@@ -39,10 +39,10 @@ void mpcgain(const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Ap,
 }
 
 void mpcgainEx(const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Ap,
-    const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Bp,
-    const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Cp,
-    const unsigned int Nc,
-    const unsigned int Np,
+    /*input: */const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Bp,
+    /*input: */const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Cp,
+    /*input: */const unsigned int Nc,
+    /*input: */const unsigned int Np,
     /*output: */Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& Phi,
     /*output: */Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& F)
 {
