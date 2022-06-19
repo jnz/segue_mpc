@@ -11,6 +11,17 @@ Simulation code written in MATLAB for rapid prototyping and analysis:
 
 ![MPC](doc/velocity_prediction.png)
 
+BOM
+---
+
+- Raspberry Pi 3 (or similar)
+- Jumper wires to connect the Raspberry Pi to the Arduino
+- Elegoo Tumbller kit (https://www.amazon.de/gp/product/B07QVKPT6J/ref=ppx_yo_dt_b_asin_title_o03_s00?ie=UTF8&psc=1)
+- 2x 18650 batteries
+- 18650 battery shield (https://www.amazon.de/gp/product/B0822Q4VS4/ref=ppx_yo_dt_b_asin_title_o02_s00?ie=UTF8&psc=1)
+
+A 3D printer is helpful to properly mount the Raspberry and the 18650 batteries.
+
 Block diagram
 -------------
 
@@ -67,7 +78,8 @@ Block diagram
     |Motor left|       | Motor right|
     +----------+       +------------+
 
-Prerequisites:
+Prerequisites
+-------------
 
     - Raspberry Pi has stable separate power supply
     - Raspberry Pi UART/serial port is active and login shell over serial is disabled
