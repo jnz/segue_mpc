@@ -1,5 +1,13 @@
-Model Predictive Control For A Two Wheel Robot
-==============================================
+Model Predictive Control (MPC) For A Segway-like Two Wheel Robot
+================================================================
+
+- Glue code written in Python
+- Control code written in C++
+- Running on a Raspberry Pi, connected to an Elegoo Tumbller kit
+
+![MPC](doc/segue.jpg)
+
+Simulation code written in MATLAB for rapid prototyping and analysis:
 
 ![MPC](doc/velocity_prediction.png)
 
@@ -62,7 +70,7 @@ Block diagram
 Prerequisites:
 
     - Raspberry Pi has stable separate power supply
-    - Raspberry Pi UART/serial port is active and login shell over serial is disabled (run sudo raspberry-pi)
+    - Raspberry Pi UART/serial port is active and login shell over serial is disabled
     - Raspberry Pi UART connect to Arduino UART pins:
 
         Raspberry Pi                    Arduino
@@ -106,10 +114,12 @@ the src/ folder:
 
       >> mex -O mpcctrl_mex.cpp mpcctrl.cpp mpcgain.cpp qphild.cpp -DCL1NORM_NO_MEX cl1norm.cpp -I./
 
-Quickstart (Windows)
---------------------
+Windows
+-------
 
-Windows only partially supported but code can run pretty much on any platform.
+Windows only partially supported. The MATLAB simulation runs out of the box on Windows,
+but the Python code (ctrl.py) expects a Raspberry Pi connected to an Arduino on
+an Elegoo Tumbller 2-wheel robot.
 
 System model
 -----------
@@ -142,38 +152,11 @@ System model
 Raspberry Pi Serial Port Configuration
 --------------------------------------
 
+Enable and configure the serial port on the Raspberry Pi via:
+
+    sudo raspi-config
+
 ![MPC](doc/raspberry_pi_serial.png)
 
 ![MPC](doc/raspberry_pi_serial_login.png)
-
-Wheel Ticks
------------
-
-meters per tick: 0.00027195
-                 ----------
-
-
-Motor data
-----------
-
-Ticks in 5 seconds:
-
-Measurement 1: 15607
-Measurement 2: 16918
-Measurement 3: 15865
-
-3147.2 Ticks / Sek.
-
-0.8559 m/s
-
-Diameter wheel = 6.8 cm
-
-0.8559 / (pi*0.068) = m/s / m = 4.0065 U/s => 240 RPM
-                                              -------
-Stall Torque:
-
-580-600 g
-l = 14 cm
-Stall torque: = 0.58*9.81*0.14 = 0.8 Nm
-                                 ------
 
