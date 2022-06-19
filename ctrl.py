@@ -1,8 +1,18 @@
+# Glue code for linear MPC of a two-wheel robot
+#
+# Tasks:
+#   - Read in sensor data from UART/serial port from Arduino
+#   - Feed sensor data (accelerometer/gyroscope) to external attitude
+#     estimation library (libpynav.so)
+#   - Run libctrl.so for MPC command
+#   - Send back motor commands via UART to Arduino
+
+
 import numpy as np
 import ctypes
 
-lib = ctypes.cdll.LoadLibrary('./libpynav.so')
-libMPC = ctypes.cdll.LoadLibrary('./libctrl.so')
+lib = ctypes.cdll.LoadLibrary('./libpynav.so')    # State estimation library
+libMPC = ctypes.cdll.LoadLibrary('./libctrl.so')  # MPC control library
 
 import time
 import random
@@ -11,6 +21,7 @@ from datetime import datetime
 import time
 import serial
 
+# Connected to Arduino
 ser = serial.Serial(
         port='/dev/ttyS0',
         baudrate = 250000,
@@ -24,12 +35,12 @@ if lib.pynavInit() == False:
     print("pynav library failed to initialize")
     quit()
 
-tempC_c = ctypes.c_float(30.0)
-roll_c = ctypes.c_float()
-pitch_c = ctypes.c_float()
-yaw_c = ctypes.c_float()
-dt_sec = ctypes.c_float()
-timestamp = ctypes.c_uint()
+roll_c = ctypes.c_float()     # attitude (roll) output by libpynav
+pitch_c = ctypes.c_float()    # attitude (pitch) output by libpynav
+yaw_c = ctypes.c_float()      # attitude (yaw) output by libpynav
+dt_sec = ctypes.c_float()     # time interval (in sec) for libpynav integration interval
+timestamp = ctypes.c_uint()   # calculate timestamp for libpynav
+tempC_c = ctypes.c_float(30.0) # feed some temperature to libpynav
 
 epoch = 0
 last_fps_calc = 0
@@ -41,26 +52,26 @@ sample_time = 1/50.0
 frame_time = 0
 start_time = time.time()
 
-isMpcInit = False
-u = 0
-theta_correction = 0.5
-theta_c = ctypes.c_double(pitch_c.value*np.pi/180.0)
-thetadot_c = ctypes.c_double(0)
-thetadot_correction_c = ctypes.c_float(0)
-pos_x = 0;
-vel_x = 0
-meters_per_tick = 0.00027195
+isMpcInit = False              # libctrl.so initialized and ready?
+u = 0                          # motor command between -1.0 and 1.0 (0.0 = off)
+theta_correction = 0.5         # robot angle correction in degree
+theta_c = ctypes.c_double(pitch_c.value*np.pi/180.0) # robot angle (0 = upright)
+thetadot_c = ctypes.c_double(0) # rotation rate of robot
+thetadot_correction_c = ctypes.c_float(0) # gyroscope/rotation rate bias correction
+pos_x = 0                      # start robot position at 0
+vel_x = 0                      # initial velocity
+meters_per_tick = 0.00027195   # convert wheel odometry ticks to meter
 
 def motorStop():
-    ser.write(b'<0,0>')
+    ser.write(b'<0,0>')        # set PWM to 0 (= motors off)
 
 def shutdown():
     motorStop()
     quit()
 
-flog = open("logfile.txt", "w")
+flog = open("logfile.txt", "w") # log data (can be viewed with MATLAB/analyze_log.m)
 
-buffer_string = ''
+buffer_string = ''  # UART input buffer for parser
 try:
     while True:
         timestamp_current = time.time()
@@ -76,6 +87,7 @@ try:
             continue;
         buffer_string += ser.read(bytesReady).decode()
 
+        # split up complete lines and only consume the latest message
         if '\n' in buffer_string: 
             lines = buffer_string.split('\n')
             cc = lines[-2]
@@ -88,15 +100,18 @@ try:
             print("Incomplete low-level machine message")
             continue
 
+        # input data from Arduino is a space separated list of ASCII text values
         dt_ms_ticks = float(cl[1]) # time since last wheel tick measurement
-        ticks_left = float(cl[8])
-        ticks_right = float(cl[9])
-        voltage = float(cl[10])/10.0
-        inputfreqHz = int(cl[11])
-        dx = 0.5*(ticks_left+ticks_right)*meters_per_tick
-        pos_x = pos_x + dx
-        vel_x = dx/(dt_ms_ticks/1000.0)
+        ticks_left = float(cl[8])  # ticks from left wheel since last message
+        ticks_right = float(cl[9]) # ticks from right wheel since last message
+        voltage = float(cl[10])/10.0 # voltage of Arduino/motors (2x3.7 V nominal level)
+        inputfreqHz = int(cl[11])  # number of messages the Arduino receives from the Raspberry per second
 
+        dx = 0.5*(ticks_left+ticks_right)*meters_per_tick # wheel odometry increment
+        pos_x = pos_x + dx
+        vel_x = dx/(dt_ms_ticks/1000.0) # horizontal velocity from wheel ticks
+
+        # convert 16-bit raw MPU6050 IMU data to rad/s and m/s² (max. 4G and 1000 °/s)
         accX =-float(cl[2 + 1])*((1/8192.0)*9.81)
         accY =-float(cl[2 + 0])*((1/8192.0)*9.81)
         accZ =-float(cl[2 + 2])*((1/8192.0)*9.81)
@@ -108,14 +123,11 @@ try:
         time_sec = timestamp_current - timestamp0
         time_sec_c = ctypes.c_uint(int(1000*time_sec)) # timestamp in milliseconds
 
-        # if isMpcInit == True:
-        #     if timestamp_current - start_time > 10.0:
-        #         shutdown()
-
         dt_sec = timestamp_current - timestamp_last
         dt_sec_c = ctypes.c_float(dt_sec)
         timestamp_last = timestamp_current
 
+        # convert data for C-library (libpynav.so)
         accX_c = ctypes.c_float(accX)
         accY_c = ctypes.c_float(accY)
         accZ_c = ctypes.c_float(accZ)
@@ -137,14 +149,15 @@ try:
                 statusMPC = libMPC.MPC_Run(pos_x_c, vel_x_c, theta_c, thetadot_c, ctypes.byref(u_c))
                 if statusMPC == True:
                     u = u_c.value
+                    # Experimental LQR:
                     # u = -(-0.001)*pos_x_c.value -(0.0096)*vel_x_c.value -(-2.2)*theta_c.value -(-0.5)*thetadot_c.value;
                 else:
                     print("No MPC solution found")
-                    # shutdown()
             else:
                 u = 0
 
             if isMpcInit == False and np.abs(theta_c.value) < 7.0*np.pi/180.0:
+                # Robot model system parameters (Elegoo Tumbller robot kit)
                 pos_x_c = ctypes.c_double(pos_x)
                 vel_x_c = ctypes.c_double(vel_x)
                 f1_c = ctypes.c_double(-7.54)
