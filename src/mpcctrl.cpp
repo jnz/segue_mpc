@@ -32,7 +32,7 @@
 #define N                     50            /* prediction epochs */
 #define Nc                    25            /* Nc <= N, number of control epochs */
 #define STATE_LEN             4             /* size of state vector x (position, velocity, theta, thetadot) */
-#define Y_LEN                 1             /* size of reference state vector */
+#define Y_LEN                 2             /* size of reference state vector */
 #define MODEL_UMAX            1.0           /* control input u constraint */
 #define MODEL_UMIN           -1.0           /* control input u constraint */
 
@@ -115,8 +115,8 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     Eigen::Matrix<double, STATE_LEN, STATE_LEN> Ap;
     Eigen::Matrix<double, STATE_LEN, 1> Bp;
     /* Track velocity and angle theta */
-    // Cp << 0,1,0,0, 0,0,1,0; // y = C*x
-    Cp << 0,0,1,0; // y = C*x
+    Cp << 0,1,0,0, 0,0,1,0; // y = C*x
+    // Cp << 0,0,1,0; // y = C*x
     c2dm(A, B, Ap, Bp, DT_SEC);
 
     Rs.setZero(); /* set zero as reference trajectory */
@@ -132,20 +132,6 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     x_prev << pos_x, vel_x, theta, thetadot; /* store previous state for ext. state model */
 
     mpcgainEx(Ap, Bp, Cp, Nc, N, /*out:*/Phi, /*out:*/F);
-
-    Q.resize(N*Y_LEN, N*Y_LEN);
-    Q.setIdentity();
-    /* set weights of velocity higher */
-    /*
-    for (int i=0;i<Q.rows();i+=2)
-    {
-        Q(i, i) *= 1.5;
-    }
-    */
-    Eigen::Matrix<double, Nc, Nc> Rbar;
-    Rbar.setIdentity();
-    Rbar *= rbar;
-    H = (Phi.transpose()*Q*Phi + Rbar);
 
     #ifdef USE_CL1NORM
     Astar.resize(N*Y_LEN + Nc, Nc);
@@ -166,6 +152,19 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     ULIM.block<Nc, 1>(0, 0) *= MODEL_UMAX;
     ULIM.block<Nc, 1>(Nc, 0) *= -MODEL_UMIN;
 #endif
+
+    Q.resize(N*Y_LEN, N*Y_LEN);
+    Q.setIdentity();
+    /* set weights of state */
+    for (int i=0;i<Q.rows();i+=Y_LEN)
+    {
+        Q(i+0, i+0) *= 1.2;
+        Q(i+1, i+1) *= 1.0;
+    }
+    Eigen::Matrix<double, Nc, Nc> Rbar;
+    Rbar.setIdentity();
+    Rbar *= rbar;
+    H = (Phi.transpose()*Q*Phi + Rbar);
 
     return true;
 }
@@ -217,9 +216,8 @@ bool MPC_Run(double x_in, double in_xdot, double theta, double thetadot, double*
 #else
     Eigen::Matrix<double, Eigen::Dynamic, 1> U; /* output result */
     x << x_in, in_xdot, theta, thetadot;
-    const Eigen::Matrix<double, Nc, 1> f = -Phi.transpose() * (Rs - F * x);
-    const int maxIter = 10 * (H.rows() + HU.rows());
-    bool success = qphild(H, f, HU, ULIM, U, maxIter, QPHILD_TOLER);
+    const Eigen::Matrix<double, Nc, 1> f = -Phi.transpose() * Q * (Rs - F * x);
+    bool success = qphild(H, f, HU, ULIM, U);
     if (success)
         *u = U(0);
     return success;
