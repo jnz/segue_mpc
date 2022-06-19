@@ -45,6 +45,8 @@ extern "C" {
  */
 bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double f1, double f2, double f3, double f4, double b1, double b2, double rbar);
 
+void MPC_SetThetaRef(double theta);
+
 /**
  * @brief Calculate next control input command u.
  *

@@ -32,7 +32,7 @@
 #define N                     50            /* prediction epochs */
 #define Nc                    25            /* Nc <= N, number of control epochs */
 #define STATE_LEN             4             /* size of state vector x (position, velocity, theta, thetadot) */
-#define Y_LEN                 2             /* size of reference state vector */
+#define Y_LEN                 1             /* size of reference state vector */
 #define MODEL_UMAX            1.0           /* control input u constraint */
 #define MODEL_UMIN           -1.0           /* control input u constraint */
 
@@ -115,8 +115,8 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     Eigen::Matrix<double, STATE_LEN, STATE_LEN> Ap;
     Eigen::Matrix<double, STATE_LEN, 1> Bp;
     /* Track velocity and angle theta */
-    Cp << 0,1,0,0, 0,0,1,0; // y = C*x
-    // Cp << 0,0,1,0; // y = C*x
+    // Cp << 0,1,0,0, 0,0,1,0; // y = C*x
+    Cp << 0,0,1,0; // y = C*x
     c2dm(A, B, Ap, Bp, DT_SEC);
 
     Rs.setZero(); /* set zero as reference trajectory */
@@ -168,6 +168,12 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
 #endif
 
     return true;
+}
+
+void MPC_SetThetaRef(double theta)
+{
+    Rs.setOnes();
+    Rs *= theta;
 }
 
 /**
