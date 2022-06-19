@@ -1,6 +1,8 @@
 Model Predictive Control For A Two Wheel Robot
 ==============================================
 
+![MPC](doc/velocity_prediction.png)
+
 Block diagram
 -------------
 
@@ -58,8 +60,9 @@ Block diagram
     +----------+       +------------+
 
 Prerequisites:
+
     - Raspberry Pi has stable separate power supply
-    - Raspberry Pi UART/serial port is active and login shell over serial is disabled (run sudo raspberry-pi
+    - Raspberry Pi UART/serial port is active and login shell over serial is disabled (run sudo raspberry-pi)
     - Raspberry Pi UART connect to Arduino UART pins:
 
         Raspberry Pi                    Arduino
@@ -68,6 +71,8 @@ Prerequisites:
         Pin 10/GPIO15 (UART0_RXD) ----- Pin 1 (TX)
 
         Gnd (e.g. Pin 6)          ----- Gnd Pin
+
+![MPC](doc/raspberry_pi_gpio.png)
 
 Quickstart (Linux)
 ------------------
@@ -88,14 +93,16 @@ Run on the Raspberry Pi:
 MATLAB
 ------
 
+![Motor model](doc/matlab_simulation_annotation.png)
+
 Run simulation in MATLAB:
 
     MATLAB/segue.m
 
-
-
-Compile MPC module (libctrl.dll/libctrl.so) as MATLAB .mex module
-from the MATLAB command line in the src/ folder:
+The MATLAB simulation has the MPC code as MATLAB .m code, but you can also
+include the C++ version as .mex file: Compile the MPC module
+(libctrl.dll/libctrl.so) as MATLAB .mex module from the MATLAB command line in
+the src/ folder:
 
       >> mex -O mpcctrl_mex.cpp mpcctrl.cpp mpcgain.cpp qphild.cpp -DCL1NORM_NO_MEX cl1norm.cpp -I./
 
@@ -109,26 +116,35 @@ System model
 
   STATE SPACE MODEL
   -----------------
- 
+
      4x1 state vector x of two wheel robot:
- 
+
      x = [ position(m)  velocity(m/s) theta(rad)  thetadot(rad/s) ]
- 
+
      u = 1x1 Wheel motor control input variable between 1.0 (max. forward
            speed) and -1.0 (max. backward speed)
- 
- 
+
+
      A = [0      1              0                0;
           0      f1             f2               0;
           0      0              0                1;
           0      f3             f4               0];
- 
+
      B = [     0;
                b1;
                0;
                b2];
- 
+
      xdot(k) = A*x(k) + B*u(k)
+
+![Motor model](doc/velocity_model.png)
+
+Raspberry Pi Serial Port Configuration
+--------------------------------------
+
+![MPC](doc/raspberry_pi_serial.png)
+
+![MPC](doc/raspberry_pi_serial_login.png)
 
 Wheel Ticks
 -----------
@@ -151,7 +167,7 @@ Measurement 3: 15865
 0.8559 m/s
 
 Diameter wheel = 6.8 cm
- 
+
 0.8559 / (pi*0.068) = m/s / m = 4.0065 U/s => 240 RPM
                                               -------
 Stall Torque:
