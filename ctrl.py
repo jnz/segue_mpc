@@ -52,6 +52,10 @@ sample_time = 1/50.0
 frame_time = 0
 start_time = time.time()
 
+# induce kicks for system identification
+timestamp_last_kick = time.time()
+u_kick = 0
+
 isMpcInit = False              # libctrl.so initialized and ready?
 u = 0                          # motor command between -1.0 and 1.0 (0.0 = off)
 theta_correction = 0.8         # robot angle correction in degree
@@ -163,7 +167,7 @@ try:
             theta_c = ctypes.c_double(-pitch_c.value*np.pi/180.0 + theta_correction*np.pi/180.0)
             thetadot_c = ctypes.c_double(-(gyrY - thetadot_correction_c.value))
 
-            if np.abs(theta_c.value) < 25.0*np.pi/180.0 and isMpcInit:
+            if np.abs(theta_c.value) < 35.0*np.pi/180.0 and isMpcInit:
                 thetaCtrl = constrain(thetaCtrl, -thetaCtrlMax, thetaCtrlMax)
                 thetaCtrl_c = ctypes.c_double(thetaCtrl)
                 libMPC.MPC_SetThetaRef(thetaCtrl_c)
@@ -179,6 +183,19 @@ try:
                 statusMPC = libMPC.MPC_Run(pos_x_c, vel_x_c, theta_c, thetadot_c, ctypes.byref(u_c))
                 if statusMPC == True:
                     u = u_c.value
+                    # if time.time() - timestamp_last_kick > 3.0:
+                    #     timestamp_last_kick = time.time()
+                    #     u_kick = 3
+                    #     l = [0.7, 0.8, 0.9]
+                    #     u_kick_value = random.choice(l)
+
+                    # if u_kick > 0:
+                    #     u_kick = u_kick - 1
+                    #     u = u_kick_value
+                    #     if u_kick == 0 and u_kick_value > 0:
+                    #         u_kick = 3
+                    #         u_kick_value = -u_kick_value
+
                     # Experimental LQR:
                     # u = -(-0.001)*pos_x_c.value -(0.0096)*vel_x_c.value -(-2.2)*theta_c.value -(-0.5)*thetadot_c.value;
                 else:
@@ -190,12 +207,12 @@ try:
                 # Robot model system parameters (Elegoo Tumbller robot kit)
                 pos_x_c = ctypes.c_double(pos_x)
                 vel_x_c = ctypes.c_double(constrain(vel_x, -VEL_CLIP, VEL_CLIP))
-                f1_c = ctypes.c_double(-7.54)
-                f2_c = ctypes.c_double(0.03)
+                f1_c = ctypes.c_double(-8.0)
+                f2_c = ctypes.c_double(0.1)
                 f3_c = ctypes.c_double(0.0)
-                f4_c = ctypes.c_double(30.0)
-                b1_c = ctypes.c_double(5.73)
-                b2_c = ctypes.c_double(-200) # ext. state
+                f4_c = ctypes.c_double(40.0)
+                b1_c = ctypes.c_double(5.83)
+                b2_c = ctypes.c_double(-150) # ext. state
                 rbar = ctypes.c_double(0.7) # 0.7-0.8 for ext. state, way less for non-ext state
                 if libMPC.MPC_Init(pos_x_c, vel_x_c, theta_c, thetadot_c, f1_c, f2_c, f3_c, f4_c, b1_c, b2_c, rbar) == False:
                     print("Failed to initialize MPC library")

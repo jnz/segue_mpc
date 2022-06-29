@@ -115,7 +115,7 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     Eigen::Matrix<double, STATE_LEN, STATE_LEN> Ap;
     Eigen::Matrix<double, STATE_LEN, 1> Bp;
     /* Track velocity and angle theta */
-    Cp << 0,1,0,0, 0,0,1,0; // y = C*x
+    Cp << 1,0,0,0, 0,0,1,0; // y = C*x
     // Cp << 0,0,1,0; // y = C*x
     c2dm(A, B, Ap, Bp, DT_SEC);
 
