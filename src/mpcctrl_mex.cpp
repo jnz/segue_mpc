@@ -79,7 +79,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const double theta_prev    = xp[2];
     const double thetadot_prev = xp[3];
 
-    if(!MPC_Init(pos_x_prev, vel_x_prev, theta_prev, thetadot_prev))
+    double f1 = -7.54;
+    double f2 = 0.03;
+    double f3 = 0;
+    double f4 = 30;
+    double b1 = 5.73;
+    double b2 = -200;
+    double rbar = 1.5;
+
+    if(!MPC_Init(pos_x_prev, vel_x_prev, theta_prev, thetadot_prev, f1, f2, f3, f4, b1, b2, rbar))
     {
         mexErrMsgIdAndTxt("JanZwiener:mpc",
                           "MPC_Init failed");

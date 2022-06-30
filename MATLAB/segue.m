@@ -19,10 +19,11 @@ epoch = control_every_n_epoch;
 %% Initialize model
 model = model_init(model);
 % select control law here:
-% model = control_init_linear(model);
-model = control_init_linear_ext(model);
+model = control_init_linear(model);
+% model = control_init_linear_ext(model);
 % model = control_init_linear_ext_cl1norm(model);
 % model = control_init_lqr(model);
+% model = control_init_mex(model);
 model.epochCtrl = 0;
 
 %% Setup Simulation
@@ -97,57 +98,9 @@ model.uMax =  1;
 model.x = zeros(4,1); % [x, xdot, theta, thetadot] (m, m/s, rad, rad/s)
 model.x(3) = 25*pi/180;
 
-I_table = [
-  % mass (kg),     w (m), d (m), offset to wheel center (m)
-    0.200, sqrt(3)*0.085, 0.025, 0.16; ... % top emoji battery
-    0.020,         0.084, 0.002, 0.15; ... % top plate
-    0.045,         0.054, 0.017, 0.13; ... % raspberry pi 3
-    0.040,         0.084, 0.004, 0.11; ... % rpi plate
-    0.102,         0.048, 0.019, 0.10; ... % battery
-    0.034,         0.084, 0.004, 0.09; ... % battery plate
-    0.049,         0.080, 0.010, 0.05; ... % arduino
-    0.072,         0.084, 0.004, 0.03; ... % aluminum plate
-    0.046,         0.045, 0.010, 0.01; ... % motor brackets
-    0.017,         0.040, 0.005, 0.02; ... % kippschutz
-    ];
-
-mass_sum_kg = 0; % sum up mass in table
-mass_total_kg = 1.063; % total weight in kg
-mass_wheel_kg = 0.0360; % single wheel mass in kg
-mass_motor_kg = 0.150;
-Ir = 0;
-CoM = 0;
-for i=1:size(I_table,1)
-    m = I_table(i,1);
-    mass_sum_kg = mass_sum_kg + m;
-    w = I_table(i,2);
-    h = I_table(i,3);
-    d = I_table(i,4);
-    Ir = Ir + 1/12*m*(w^2 + h^2) + m*d^2;
-    CoM = CoM + m*d;
-end
-
-mass_sum_kg = mass_sum_kg + 2*mass_motor_kg;
-Ir = Ir + 1/2 * (2*mass_motor_kg)*0.031^2; % 2x motor in CoA (150 g each)
-% CoM = CoM + m*d; % skip, as motors are at the wheel center (d=0)
-
-unaccounted_mass_kg = mass_total_kg - 2*mass_wheel_kg - mass_sum_kg;
-d = 0.08;
-Ir = Ir + 1/12*unaccounted_mass_kg*(0.10^2 + 0.08^2) + unaccounted_mass_kg*d^2;
-CoM = CoM + unaccounted_mass_kg*d;
-mass_sum_kg = mass_sum_kg + unaccounted_mass_kg;
-CoM = CoM/mass_sum_kg;
-
 % dimensions
-model.L = CoM; % distance: wheel center to center of mass
-model.M = 2*mass_wheel_kg; % mass wheels in kg
+model.L = 0.09; % distance: wheel center to center of mass
 model.R = 0.035; % radius wheels in m
-model.m = mass_total_kg - model.M;
-model.Iw = 0.5*model.M*model.R^2; % m*r^2 (inertia wheel)
-model.Ir = Ir; % inertia body
-% motor model
-model.km_per_R = 0.80; % 0.80 Nm stall torque
-model.ke = 0.1/240; % max. no load speed in rad/s (=240 RPM)
 
 end
 
@@ -155,7 +108,7 @@ function [x_k_dot, A, B] = fdot(x_k, u, model)
 
 f1 = -7.54; % estimated from sysidF1.m
 f2 = 0.03;  % estimated from sysidF1.m
-f3 = 0;     % friction
+f3 = 0;     %
 f4 = 30;    % estimated from drop tests in sysidF4.m
 b1 = 5.73;  % estimated from sysidF1.m
 b2 = -200;  % estimated experimentally
@@ -363,6 +316,13 @@ model.K = lqr(A, B, diag([0.00001 0.01 1 0.2]), 10);
 
 end
 
+function [model] = control_init_mex(model)
+
+model.ctrl_func = @control_run_mex;
+model.x_prev = model.x;
+
+end
+
 function [model, u] = control_run_linear_ext(model, dt_sec, u)
 
 %% Linear MPC
@@ -461,6 +421,16 @@ u = -model.K * model.x;
 % Ki = -0.01;
 % Kd = -0.005;
 % u = Kp*e + Ki*model.integrator + Kd*derivative;
+
+end
+
+function [model, u] = control_run_mex(model, dt_sec, u)
+
+u = mpcctrl_mex(model.x, model.x_prev, u);
+model.x_prev = model.x;
+
+u(u > model.uMax) = model.uMax;
+u(u < model.uMin) = model.uMin;
 
 end
 

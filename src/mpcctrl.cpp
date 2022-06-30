@@ -141,9 +141,9 @@ bool MPC_Init(double pos_x, double vel_x, double theta, double thetadot, double 
     lstar.resize(N*Y_LEN + Nc, 1);
     lstar.setZero();
 
-    std::cout << "CL1NORM active. Control weight: " << CL1NORM_INPUT_WEIGHT << " Astar = " << std::endl << Astar << std::endl << std::endl;
-#else
-    std::cout << "Extended state model active." << std::endl << std::endl;
+    // std::cout << "CL1NORM active. Control weight: " << CL1NORM_INPUT_WEIGHT << " Astar = " << std::endl << Astar << std::endl << std::endl;
+    #else
+    // std::cout << "Extended state model active." << std::endl << std::endl;
     #endif
 #else
     mpcgain(Ap, Bp, Cp, Nc, N, /*out:*/Phi, /*out:*/F);
