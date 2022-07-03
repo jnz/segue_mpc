@@ -168,8 +168,11 @@ Nc = model.Nc;
 HU = [tril(ones(Nc)); -tril(ones(Nc))];
 ULIM = [ones(Nc,1)*model.uMax; -model.uMin*ones(Nc,1)];
 
-H = (model.lin_Phi'*model.lin_Phi + model.lin_Rbar);
-f = -model.lin_Phi'*(model.lin_Rs - model.lin_F*model.x);
+% Weight matrix
+Q = eye(size(model.lin_Phi, 1));
+
+H = (model.lin_Phi'*Q*model.lin_Phi + model.lin_Rbar);
+f = -model.lin_Phi'*Q*(model.lin_Rs - model.lin_F*model.x);
 
 %upred = quadprog(H, f, HU, ULIM, [], [], [], [], [], optimset('Display', 'off')); % disable console output
 upred = qphild(H, f, HU, ULIM);
