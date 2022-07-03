@@ -207,12 +207,12 @@ try:
                 # Robot model system parameters (Elegoo Tumbller robot kit)
                 pos_x_c = ctypes.c_double(pos_x)
                 vel_x_c = ctypes.c_double(constrain(vel_x, -VEL_CLIP, VEL_CLIP))
-                f1_c = ctypes.c_double(-8.0)
-                f2_c = ctypes.c_double(0.1)
+                f1_c = ctypes.c_double(-7.54)
+                f2_c = ctypes.c_double(0.03)
                 f3_c = ctypes.c_double(0.0)
-                f4_c = ctypes.c_double(40.0)
-                b1_c = ctypes.c_double(5.83)
-                b2_c = ctypes.c_double(-150) # ext. state
+                f4_c = ctypes.c_double(30.0)
+                b1_c = ctypes.c_double(5.73)
+                b2_c = ctypes.c_double(-200) # ext. state
                 rbar = ctypes.c_double(0.7) # 0.7-0.8 for ext. state, way less for non-ext state
                 if libMPC.MPC_Init(pos_x_c, vel_x_c, theta_c, thetadot_c, f1_c, f2_c, f3_c, f4_c, b1_c, b2_c, rbar) == False:
                     print("Failed to initialize MPC library")
