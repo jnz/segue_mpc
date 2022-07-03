@@ -19,11 +19,12 @@ epoch = control_every_n_epoch;
 %% Initialize model
 model = model_init(model);
 % select control law here:
-model = control_init_linear(model);
+% model = control_init_linear(model);
 % model = control_init_linear_ext(model);
 % model = control_init_linear_ext_cl1norm(model);
 % model = control_init_lqr(model);
 % model = control_init_mex(model);
+model = control_init_acado(model);
 model.epochCtrl = 0;
 
 %% Setup Simulation
@@ -179,7 +180,7 @@ upred = qphild(H, f, HU, ULIM);
 upred(upred > model.uMax) = model.uMax;
 upred(upred < model.uMin) = model.uMin;
 Ypred = model.lin_F*model.x + model.lin_Phi*upred;
-% predict_plot(model, upred, model.lin_Cp, Ypred, dt_sec);
+predict_plot(model, upred, model.lin_Cp, Ypred, dt_sec);
 
 u = upred(1);
 
@@ -406,6 +407,67 @@ u = u + DU(1); % u(k) = u(k-1) + du(k)
 u(u > model.uMax) = model.uMax;
 u(u < model.uMin) = model.uMin;
 
+
+end
+
+function [model] = control_init_acado(model)
+
+model.ctrl_func = @control_run_acado;
+model.N = 30;
+
+N = model.N; % prediction epochs
+
+X0 = model.x';
+input.x0 = X0;
+Xref = [0 0 0 0];
+input.x = [repmat(X0,N/2,1); repmat(Xref,N/2+1,1)];
+Uref = zeros(N,1);
+input.u = Uref;
+% input.od = [];
+input.y = [repmat(Xref,N,1) Uref];
+input.yN = Xref;
+
+% input.W = diag([0 75 150 0 0.0001]);
+% input.WN = diag([0 80 100 0]);
+input.W = diag([0 10 150 0 0.1]);
+input.WN = diag([0 40 100 0]);
+
+% input.control = 1;
+% handleCart.out = acado_solver(input);
+% input.control = 0;
+input.shifting.strategy = 1;
+
+model.input = input;
+
+
+end
+
+function [model, u] = control_run_acado(model, dt_sec, u)
+
+X0 = model.x';
+model.input.x0 = X0;
+output = acado_solver(model.input);
+
+%fprintf('u: %.2f ', output.u(1));
+%disp([' (RTI step -- QP error: ' num2str(output.info.status) ',' ' ' char(2) ' KKT val: ' num2str(output.info.kktValue,'%1.2e') ',' ' ' char(2) ' CPU time: ' num2str(round(output.info.cpuTime*1e6)) ' µs)'])
+
+if output.info.status ~= 0
+    model.input.control = 1;
+    output = acado_solver(model.input);
+    model.input.control = 0;
+    fprintf('Reset MPC\n');
+end
+
+% Shift:
+model.out = output;
+model.input.x = model.out.x; %[handleCart.out.x(2:end,:); handleCart.out.x(end,:)];
+model.input.u = model.out.u; %[handleCart.out.u(2:end,:); handleCart.out.u(end,:)];
+
+u = output.u(1);
+
+Ypred = output.x(2:end, :);
+Ypred = reshape(Ypred', 30*4, 1);
+% predict_plot(model, output.u, eye(4), Ypred, dt_sec);
 
 end
 
